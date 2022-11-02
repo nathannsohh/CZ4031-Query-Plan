@@ -14,6 +14,27 @@ class DBConnection:
         query_results = self.cur.fetchall()
         return query_results
 
+    def getmainQEP(self, query):
+        self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
+        query_plan = self.cur.fetchall()
+        return query_plan
+
+    def getALTQEP1(self, query):
+        self.cur.execute("SET enable_nestloop TO 0")
+        self.cur.execute("SET enable_seqscan TO 0")
+        self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
+        query_plan = self.cur.fetchall()
+        self.cur.execute("SET enable_nestloop TO 1")
+        self.cur.execute("SET enable_seqscan TO 1")
+        return query_plan
+    
+    def getALTQEP2(self, query):
+        self.cur.execute("SET seq_page_cost TO " + str(0))
+        self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
+        query_plan = self.cur.fetchall()
+        self.cur.execute("SET seq_page_cost TO " + str(default_seqpage_cost))
+        return query_plan
+
     def close(self):
         self.cur.close()
         self.conn.close()
