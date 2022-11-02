@@ -2,6 +2,9 @@ import psycopg2
 import json
 import queue
 
+default_seqpage_cost = 1.0
+default_randompage_cost = 4.0
+
 class DBConnection:
     # Open connection to DB, enter your database name and password
     # Change this accordingly
