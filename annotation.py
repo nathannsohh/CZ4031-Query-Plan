@@ -1,4 +1,7 @@
+import psycopg2
+import json
 import queue
+import preprocessing
 
 class Node(object):
     """
@@ -514,3 +517,33 @@ def reset_vars():
     cur_table_name = 1
     table_subquery_name_pair = {}
 
+query = """
+    select
+        c_count,
+        count(*) as custdist
+    from
+        (
+            select
+                c_custkey,
+                count(o_orderkey)
+            from
+                customer left outer join orders on
+                    c_custkey = o_custkey
+                    and o_comment not like '%pending%packages%'
+            group by
+                c_custkey
+        ) as c_orders (c_custkey, c_count)
+    group by
+        c_count
+    order by
+        custdist desc,
+        c_count desc
+    limit 1;"""
+
+if __name__ == "__main__":
+    connection = preprocessing.DBConnection()
+    QEP = connection.getmainQEP(query)
+    AQP = connection.getALTQEP1(query)
+    connection.close()
+    comparison = generate_comparison(QEP, AQP)
+    print(comparison)
