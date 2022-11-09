@@ -12,19 +12,3 @@ Difference: 5 - sequential scan on table orders and filtering on (o_comment) tex
 Difference: 6 - sequential scan on table orders and filtering on (o_comment) text !~~ '%pending%packages%' text to get intermediate table T1 has been transformed to sequential scan on table orders and filtering on (o_comment) text !~~ '%pending%packages%' text to get intermediate table T1
 Difference: 7 - aggregate on table T2 with grouping on attribute customer.c_custkey to get intermediate table T3 has been tDifference: 8 - aggregate on table T2 with grouping on attribute customer.c_custkey to get intermediate table T3 has been transformed to merge join on table customer with index customer_pkey  and table T3  to get intermediate table T4
 Difference 8 Reasoning:
-
-PS C:\Repos\CZ4031-Query-Plan> & C:/Users/meowser/AppData/Local/Microsoft/WindowsApps/python3.10.exe c:/Repos/CZ4031-Query-Plan/annotation.py
-PostgreSQL server information
-You are connected to -  [('PostgreSQL 15.0, compiled by Visual C++ build 1914, 64-bit',)]
-
-Difference: 1 - aggregate on table T5 with grouping on attribute customer.c_custkey to get intermediate table T6 has been transformed to subquery scan on table c_orders
-Difference: 2 - aggregate on table T2 with grouping on attribute customer.c_custkey to get intermediate table T3 has been transformed to subquery scan on table c_orders
-Difference: 3 - hash table T1 and hash join on table customer  and table T1 under condition customer.c_custkey = orders.o_custkey to get intermediate table T2 has been transformed to merge join on table customer with index customer_pkey  and table T3  to get intermediate table T4
-Difference 3 Reasoning: Hash Join in Plan 1 on relation None has now transformed to Merge Join in Plan 2 on relation None. 
-This can be attributed to the actual row count returned increases from 511301 to 1533903.Both sides of the Join operator in Plan 2 can be sorted on the join condition efficiently. 
-Difference: 4 - sequential scan on table customer has been transformed to index only scan on table customer with index customer_pkey
-Difference: 5 - sequential scan on table orders and filtering on (o_comment) text !~~ '%pending%packages%' text to get intermediate table T1 has been transformed to materialize on  table T2 to get intermediate table T3
-Difference: 6 - sequential scan on table orders and filtering on (o_comment) text !~~ '%pending%packages%' text to get intermediate table T1 has been transformed to sequential scan on table orders and filtering on (o_comment) text !~~ '%pending%packages%' text to get intermediate table T1
-Difference: 7 - aggregate on table T2 with grouping on attribute customer.c_custkey to get intermediate table T3 has been transformed to aggregate on table T4 with grouping on attribute customer.c_custkey to get intermediate table T5
-Difference: 8 - aggregate on table T2 with grouping on attribute customer.c_custkey to get intermediate table T3 has been transformed to merge join on table customer with index customer_pkey  and table T3  to get intermediate table T4
-Difference 8 Reasoning:

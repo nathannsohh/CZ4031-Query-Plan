@@ -5,43 +5,37 @@ import preprocessing
 
 class Node(object):
     """
-    The Node class represents an individual node on a Query Execution Plan. Used to build the query execution plan tree.
+    The Node class represents an individual node on a QEP Tree
     """
-    def __init__(self, node_type, relation_name, schema, alias, group_key, sort_key, join_type, index_name, hash_condition, table_filter, index_condition, merge_condition, recheck_condition, join_filter, subplan_name, actual_rows, actual_time, description):
+    def __init__(self, node_type, node_cost, row_number, relation_name, 
+                group_key, sort_method, sort_key, index_name, index_condition,
+                hash_condition, merge_condition, rows_filtered, recheck_condition):
         self.node_type = node_type
+        self.node_cost = node_cost
+        self.row_number = row_number
         self.relation_name = relation_name
-        self.schema = schema
-        self.alias = alias
         self.group_key = group_key
+        self.sort_method = sort_method
         self.sort_key = sort_key
-        self.join_type = join_type
         self.index_name = index_name
-        self.hash_condition = hash_condition
-        self.table_filter = table_filter
         self.index_condition = index_condition
+        self.hash_condition = hash_condition
         self.merge_condition = merge_condition
+        self.rows_filtered = rows_filtered
         self.recheck_condition = recheck_condition
-        self.join_filter = join_filter
-        self.subplan_name = subplan_name
-        self.actual_rows = actual_rows
-        self.actual_time = actual_time
-        self.description = description
         self.children = []
 
-    def append_children(self, child):
+    def add_child(self, child):
+        """
+        Takes a child node as input and adds it to the list of children
+        """
         self.children.append(child)
-    
-    def write_qep_output_name(self, output_name):
-        if "T" == output_name[0] and output_name[1:].isdigit():
-            self.output_name = int(output_name[1:])
-        else:
-            self.output_name = output_name
 
-    def read_qep_output_name(self):
-        if str(self.output_name).isdigit():
-            return "T" + str(self.output_name)
-        else:
-            return self.output_name
+    def num_children(self):
+        """
+        Returns the number of children for this node
+        """
+        return len(self.children)
 
     def set_step(self, step):
         self.step = step
@@ -49,86 +43,114 @@ class Node(object):
     def update_desc(self,desc):
         self.description = desc
 
-def generate_qep_tree(json_plan):
-    q_child_plans = queue.Queue()
-    q_parent_plans = queue.Queue()
-    plan = json_plan[0][0][0]['Plan']
+def generate_qep_tree(json_qep_data):
+    """
+    Takes QEP in json format as input and generates a tree structure for the QEP
+    """
+    child_plans = queue.Queue() # List of Plans
+    parent_nodes = queue.Queue() # List of Nodes
 
-    q_child_plans.put(plan)
-    q_parent_plans.put(None)
+    # Get first Plan of the QEP
+    plan = json_qep_data[0][0][0]['Plan']
 
-    while not q_child_plans.empty():
-        current_plan = q_child_plans.get()
-        parent_node = q_parent_plans.get()
+    child_plans.put(plan)
+    parent_nodes.put(None)
 
-        relation_name = schema = alias = group_key = sort_key = join_type = index_name = hash_condition = table_filter \
-            = index_condition = merge_condition = recheck_condition = join_filter = subplan_name = actual_rows = actual_time = description = None
-        if 'Relation Name' in current_plan:
-            relation_name = current_plan['Relation Name']
-        if 'Schema' in current_plan:
-            schema = current_plan['Schema']
-        if 'Alias' in current_plan:
-            alias = current_plan['Alias']
-        if 'Group Key' in current_plan:
-            group_key = current_plan['Group Key']
-        if 'Sort Key' in current_plan:
-            sort_key = current_plan['Sort Key']
-        if 'Join Type' in current_plan:
-            join_type = current_plan['Join Type']
-        if 'Index Name' in current_plan:
-            index_name = current_plan['Index Name']
-        if 'Hash Cond' in current_plan:
-            hash_condition = current_plan['Hash Cond']
-        if 'Filter' in current_plan:
-            table_filter = current_plan['Filter']
-        if 'Index Cond' in current_plan:
-            index_condition = current_plan['Index Cond']
-        if 'Merge Cond' in current_plan:
-            merge_condition = current_plan['Merge Cond']
-        if 'Recheck Cond' in current_plan:
-            recheck_condition = current_plan['Recheck Cond']
-        if 'Join Filter' in current_plan:
-            join_filter = current_plan['Join Filter']
-        if 'Actual Rows' in current_plan:
-            actual_rows = current_plan['Actual Rows']
-        if 'Actual Total Time' in current_plan:
-            actual_time = current_plan['Actual Total Time']
-        if 'Subplan Name' in current_plan:
-            if "returns" in current_plan['Subplan Name']:
-                name = current_plan['Subplan Name']
-                subplan_name = name[name.index("$"):-1]
-            else:
-                subplan_name = current_plan['Subplan Name']
+    # Generate all Nodes for the QEP Tree
+    while not child_plans.empty():
+        cur_plan = child_plans.get() # Current json Plan
+        par_node = parent_nodes.get() # Parent Node
+  
+        # Set Node attributes
+        ## General Node Info
+        node_type = cur_plan['Node Type']
+        node_cost = cur_plan['Total Cost'] - cur_plan['Startup Cost']
+        row_number = cur_plan['Plan Rows']
+        relation_name = cur_plan['Relation Name'] if ('Relation Name' in cur_plan) else None
+        ## Groupings
+        group_key = cur_plan['Group Key'] if ('Group Key' in cur_plan) else None
+        ## Sorts
+        sort_method = cur_plan['Sort Method'] if ('Sort Method' in cur_plan) else None
+        sort_key = cur_plan['Sort Key'] if ('Sort Key' in cur_plan) else None
+        ## Joins
+        ### Index Join
+        index_name = cur_plan['Index Name'] if ('Index Name' in cur_plan) else None
+        index_condition = cur_plan['Index Cond'] if ('Index Cond' in cur_plan) else None
+        ### Hash Join
+        hash_condition = cur_plan['Hash Cond'] if ('Hash Cond' in cur_plan) else None
+        ### Merge Join
+        merge_condition = cur_plan['Merge Cond'] if ('Merge Cond' in cur_plan) else None
+        ## Filters
+        rows_filtered = cur_plan['Rows Removed by Filter'] if ('Rows Removed by Filter' in cur_plan) else None
+        ## Rechecks
+        recheck_condition = cur_plan['Recheck Cond'] if ('Recheck Cond' in cur_plan) else None
 
-        current_node = Node(current_plan['Node Type'], relation_name, schema, alias, group_key, sort_key, join_type,
-                            index_name, hash_condition, table_filter, index_condition, merge_condition, recheck_condition, join_filter,
-                            subplan_name, actual_rows, actual_time, description)
+        # Build the Node
+        cur_node = Node(node_type, node_cost, row_number, relation_name, 
+                        group_key, sort_method, sort_key, index_name, index_condition,
+                        hash_condition, merge_condition, rows_filtered, recheck_condition)
 
-        if "Limit" == current_node.node_type:
-            current_node.plan_rows = current_plan['Plan Rows']
-
-        if "Scan" in current_node.node_type:
-            if "Index" in current_node.node_type:
-                if relation_name:
-                    current_node.write_qep_output_name("{} with index {}".format(relation_name, index_name))
-            elif "Subquery" in current_node.node_type:
-                current_node.write_qep_output_name(alias)
-            else:
-                current_node.write_qep_output_name(relation_name)
-
-        if parent_node is not None:
-            parent_node.append_children(current_node)
+        # Add the newly built Node as a child of its parent Node
+        if par_node != None:
+            par_node.add_child(cur_node)
+        # Otherwise set the new Node as the root Node
         else:
-            root_node = current_node
+            root_node = cur_node
 
-        if 'Plans' in current_plan:
-            for item in current_plan['Plans']:
-                # push child plans into queue
-                q_child_plans.put(item)
-                # push parent for each child into queue
-                q_parent_plans.put(current_node)
+        # Add futher Plans to the list
+        if 'Plans' in cur_plan:
+            for plan in cur_plan['Plans']:
+                # Put child Plans in the list
+                child_plans.put(plan)
+                # Put the parent Nodes for each child Node into the list
+                parent_nodes.put(cur_node)
 
     return root_node
+
+def print_tree_structure(root):
+    node_list = [root, None]
+    child_num_list = [1]
+
+    while len(node_list) != 0:
+        node = node_list.pop(0)
+        # If branch has no children
+        if node == 0:
+            # If it is not the end of the tree
+            if len(node_list) > 1: # length is 1 if only 'None' is remaining
+                print("_", end = "")
+            # If there are branches on the same level
+            if node_list[0] != None:
+                print(" | ", end = "")
+            continue
+        # If end of tree level
+        if node == None:
+            print()
+            if len(child_num_list) != 0:
+                child_num_list.pop(0)
+                # If end of tree
+            if len(node_list) != 0:
+                node_list.append(None)
+            continue
+        # Print node type
+        else:
+            print(node.node_type, end = "")
+            child_num_list[0] -= 1
+            # Add children to list
+            if node.num_children() != 0:
+                for child in node.children:
+                    node_list.append(child)
+                child_num_list.append(node.num_children())
+            # Otherwise indicate no children
+            else:
+                node_list.append(0)
+        # Print colon if there is a sibling node
+        if child_num_list[0] != 0:
+            print(" : ", end = "")
+        # Print seperator there is a different branch on the same level
+        elif node_list[0] != None:
+            child_num_list.pop(0)
+            print(" | ", end = "")
+    return
 
 def generate_qep_conditions(op_name, conditions, table_subquery_name_pair):
     """
@@ -163,7 +185,6 @@ def generate_qep_text(node, skip=False):
     elif node.node_type == "Bitmap Heap Scan" and node.children[0].node_type == "Bitmap Index Scan":
         children_skip = True
     else:
-
         children_skip = False
 
     # recursive
@@ -324,6 +345,7 @@ def generate_reasons(node_a, node_b, diff_idx):
     Used in generate_text_arrays
     """
     text = ""
+    # Index Scan vs Seq Scan
     if node_a.node_type =="Index Scan" and node_b.node_type == "Seq Scan":
         text = "Difference {} Reasoning: ".format(diff_idx)
         text += "{} in Plan 1 on relation {} has now transformed to Sequential Scan in Plan 2 on relation {}. This can be attributed to "\
@@ -352,6 +374,7 @@ def generate_reasons(node_a, node_b, diff_idx):
             text += "This behavior is generally consistent with the change in the selection predicates from {} to {}."\
                 .format(node_a.table_filter if node_a.table_filter is not None else "None", node_b.index_condition if node_b.index_condition is not None else "None")
 
+    # Joins
     elif node_a.node_type and node_b.node_type in ['Merge Join', "Hash Join", "Nested Loop"]:
         text = "Difference {} Reasoning: ".format(diff_idx)
         if node_a.node_type == "Nested Loop" and node_b.node_type == "Merge Join":
@@ -409,6 +432,17 @@ def generate_reasons(node_a, node_b, diff_idx):
             text += "Both sides of the Join operator in Plan 2 can be sorted on the join condition efficiently. "
 
     return text
+
+def print_tree_nodes(node):
+    numChildren = len(node.children)
+
+    print(node.node_type)
+
+    if numChildren != 0:
+        for childNum in range(numChildren):
+            print_tree_nodes(node(numChildren))
+    
+    pass
 
 def generate_text_arrays(nodeA, nodeB, difference, reasons):
     """
@@ -542,8 +576,11 @@ query = """
 
 if __name__ == "__main__":
     connection = preprocessing.DBConnection()
-    QEP = connection.getmainQEP(query)
-    AQP = connection.getALTQEP1(query)
+    # QEP_json = connection.getmainQEP(query)
+    QEP_json = connection.getAQP345(query)
+    # AQP_json = connection.getALTQEP(query, 0)
     connection.close()
-    comparison = generate_comparison(QEP, AQP)
-    print(comparison)
+    # comparison = generate_comparison(QEP, AQP)
+    QEP = generate_qep_tree(QEP_json)
+    print_tree_structure(QEP)
+    # print(QEP_tree)
