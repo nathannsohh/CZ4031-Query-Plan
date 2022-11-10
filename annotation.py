@@ -23,6 +23,7 @@ class Node(object):
         self.merge_condition = merge_condition
         self.rows_filtered = rows_filtered
         self.recheck_condition = recheck_condition
+        self.annotation = None
         self.children = []
 
     def add_child(self, child):
@@ -30,6 +31,12 @@ class Node(object):
         Takes a child node as input and adds it to the list of children
         """
         self.children.append(child)
+
+    def set_annotation(self, annotation):
+        """
+        Adds relevant annotation to the node
+        """
+        self.annotation = annotation
 
     def num_children(self):
         """
@@ -271,6 +278,7 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
             if "Nest" in step.node_type:
                 output_string += f"Nested Loop Join\n" + \
                     "         This join is implemented using nested loop join because the cost of the nested loop is low.\n"
+                step.set_annotation(f"This join is implemented using nested loop join because the cost of the nested loop is low.")
             else:
                 output_string += step.node_type + "\n"
 
@@ -339,6 +347,7 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
                     cost_ratio = astep.node_cost / step.node_cost
                     ratio_2dp = round(cost_ratio * 100) / 100
                     output_string += f"         {step.node_type} is {ratio_2dp} times faster than {astep.node_type}.\n"
+                    step.set_annotation(f"{step.node_type} is {ratio_2dp} times faster than {astep.node_type}.")
                     if "Hash" in astep.node_type: hash_join = True
                     if "Merge" in astep.node_type: merge_join = True
                     if "Nest" in astep.node_type: nestedloop_join = True
@@ -348,6 +357,7 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
             ## Additional Explanations
             if not explained and "Nest" not in step.node_type:
                 output_string += f"         {step.node_type} is faster than other join operations.\n"
+                step.set_annotation(f"{step.node_type} is faster than other join operations.")
 
             ## Log
             if log: print("")
@@ -371,7 +381,8 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
             ## Print the name of the Scan
             if "Seq" in step.node_type:
                 output_string += f"Sequential Scan\n" + \
-                    "         Tables are read using Sequential Scan because no index is created on the tables.\n"
+                    f"         Relation {step.relation_name} is read using Sequential Scan because no index is created on the tables.\n"
+                step.set_annotation(f"Relation {step.relation_name} is read using Sequential Scan because no index is created on the tables.")
             else:
                 output_string += step.node_type + "\n"
             
@@ -395,8 +406,9 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
                 if astep and step.node_cost < astep.node_cost:
                     cost_ratio = astep.node_cost / step.node_cost
                     ratio_2dp = round(cost_ratio * 100) / 100
-                    output_string += f"         {step.node_type} is {ratio_2dp} times faster than " +\
+                    output_string += f"         {step.node_type} is used for Relation {step.relation_name} as it is {ratio_2dp} times faster than " +\
                         f"{'Sequential Scan' if 'Seq' in astep.node_type else astep.node_type}.\n"
+                    step.set_annotation(f"{'Sequential Scan' if 'Seq' in astep.node_type else astep.node_type}.")
                     if "Bitmap" in astep.node_type: bitmap_scan = True
                     if "Index Scan" in astep.node_type: index_scan = True
                     if "Index Only Scan" in astep.node_type: indexonly_scan = True
@@ -406,7 +418,8 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
                 
             ## Additional Explanations
             if not explained and "Seq" not in step.node_type:
-                output_string += f"         {step.node_type} is faster than other scan operations.\n"
+                output_string += f"         {step.node_type} is used for Relation {step.relation_name} is faster than other scan operations.\n"
+                step.set_annotation(f"{step.node_type} is used for Relation {step.relation_name} is faster than other scan operations.")
 
             ## Log
             if log: print("")
@@ -456,30 +469,42 @@ def print_annotations(anno_list):
 
 query = """
     select
-        c_count,
-        count(*) as custdist
-    from
-        (
-            select
-                c_custkey,
-                count(o_orderkey)
-            from
-                customer left outer join orders on
-                    c_custkey = o_custkey
-                    and o_comment not like '%pending%packages%'
-            group by
-                c_custkey
-        ) as c_orders (c_custkey, c_count)
-    group by
-        c_count
-    order by
-        custdist desc,
-        c_count desc
-    limit 1;"""
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice,
+	sum(l_quantity)
+from
+	customer,
+	orders,
+	lineitem
+where
+	o_orderkey in (
+		select
+			l_orderkey
+		from
+			lineitem
+		group by
+			l_orderkey having
+				sum(l_quantity) > 314
+	)
+	and c_custkey = o_custkey
+	and o_orderkey = l_orderkey
+group by
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice
+order by
+	o_totalprice desc,
+	o_orderdate
+limit 1;"""
 
 if __name__ == "__main__":
     QEP = generate_QEP(query)
     nojoin_AQPs = generate_nojoin_AQPs(query)
     noscan_AQPs = generate_noscan_AQPs(query)
-    anno_list = generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False)
+    anno_list = generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=True)
     print_annotations(anno_list)
