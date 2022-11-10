@@ -37,7 +37,7 @@ class Node(object):
         """
         return len(self.children)
 
-    def print_tree(self, prints=True):
+    def print_tree(self, enable_print=True):
         """
         Prints out the tree structure from this node
         """
@@ -97,12 +97,12 @@ class Node(object):
                 child_num_list.pop(0) # Remove children count for the current branch
                 output_string += " | " # Print branch separator
 
-        if prints:
+        if enable_print:
             print(output_string)
 
         return output_string
 
-    def print_qep_steps(self, prints=True):
+    def print_qep_steps(self, enable_print=True):
         """
         Generates the QEP steps in order
         """
@@ -122,7 +122,7 @@ class Node(object):
         # Reverse the step list
         step_list = step_list[::-1]
 
-        if prints:
+        if enable_print:
             for step in step_list:
                 print(step.node_type)
             print("")
@@ -194,11 +194,29 @@ def generate_qep_reasons(root):
     """
     Takes the root of a QEP Tree and generates an array of annotation strings
     """
-    step_list = root.print_qep_steps(prints=False) # Generate QEP steps
+    step_list = root.print_qep_steps(enable_print=False) # Generate QEP steps
 
     anno_list = []
     step_count = 1
     join_count = 0
+
+    # Generate AQPs
+    print("generating AQPs")
+    connection = preprocessing.DBConnection()
+    print("generating no_mergejoin_AQP")
+    no_mergejoin_AQP = build_qep_tree(connection.getAQP(query, enable_mergejoin=False)).print_qep_steps(enable_print=False)
+    print("generating no_hashjoin_AQP")
+    no_hashjoin_AQP = build_qep_tree(connection.getAQP(query, enable_hashjoin=False)).print_qep_steps(enable_print=False)
+    # print("generating only_NLjoin_AQP")
+    # only_NLjoin_AQP = build_qep_tree(connection.getAQP(query, enable_mergejoin=False, enable_hashjoin=False)).print_qep_steps(enable_print=False)
+    print("generating no_bitmapscan_AQP")
+    no_bitmapscan_AQP = build_qep_tree(connection.getAQP(query, enable_bitmapscan=False)).print_qep_steps(enable_print=False)
+    print("generating no_indexscan_AQP")
+    no_indexscan_AQP = build_qep_tree(connection.getAQP(query, enable_indexscan=False)).print_qep_steps(enable_print=False)
+    print("generating only_seqscan_AQP")
+    only_seqscan_AQP = build_qep_tree(connection.getAQP(query, enable_bitmapscan=False, enable_indexscan=False)).print_qep_steps(enable_print=False)
+    connection.close()
+    print("finished generating AQPs\n")
 
     # Go through the step list
     for step in step_list: 
@@ -207,21 +225,75 @@ def generate_qep_reasons(root):
 
         # Join
         if "Join" in step.node_type:
-            
-            output_string += step.node_type + "\n"
+            ## Nested Loop Join
+            if "Nest" in step.node_type:
+                output_string += f"Nested Loop Join\n"
+                output_string += \
+                    "         This join is implemented using nested loop join because the cost of the nested loop is low.\n"
+            ## Other Join
+            else:
+                output_string += step.node_type + "\n"
+                # Compare with Merge Join
+                # Compare with Hash Join
+                # Compare with Nested Loop Join
+
+            # Increment join count for tracking
             join_count += 1
 
         # Scan
         elif "Scan" in step.node_type:
+            
             ## Sequential Scan
             if "Seq" in step.node_type:
                 output_string += f"Sequential Scan\n"
                 output_string += \
-                "         Tables are read using sequential scan.\n" + \
-                "         This is because no index is created on the tables.\n"
+                    "         Tables are read using sequential scan because no index is created on the tables.\n"
+            
+            ## Other Scan
             else:
                 output_string += step.node_type + "\n"
-
+                
+                ### Compare with Bitmap Scan
+                if "Bitmap" not in step.node_type:
+                    #### Find a Scan node on the same Relation
+                    astep = None
+                    for anode in no_indexscan_AQP:
+                        if anode.relation_name == step.relation_name and "Bitmap" in anode.node_type:
+                            astep = anode
+                            break
+                    #### Check if QEP step is faster than AQP step
+                    if astep and step.node_cost < astep.node_cost:
+                        cost_ratio = astep.node_cost / step.node_cost
+                        ratio_2dp = round(cost_ratio * 100) / 100
+                        output_string += f"         {step.node_type} is {ratio_2dp} faster than astep.node_type"
+                
+                ### Compare with Index Scan
+                if "Index" not in step.node_type:
+                    #### Find a Scan node on the same Relation
+                    astep = None
+                    for anode in no_bitmapscan_AQP:
+                        if anode.relation_name == step.relation_name and "Index" in anode.node_type:
+                            astep = anode
+                            break
+                    #### Check if QEP step is faster than AQP step
+                    if astep and step.node_cost < astep.node_cost:
+                        cost_ratio = astep.node_cost / step.node_cost
+                        ratio_2dp = round(cost_ratio * 100) / 100
+                        output_string += f"         {step.node_type} is {ratio_2dp} faster than astep.node_type"
+                
+                ### Compare with Sequential Scan
+                #### Find a Scan node on the same Relation
+                astep = None
+                for anode in only_seqscan_AQP:
+                    if anode.relation_name == step.relation_name and "Seq" in anode.node_type:
+                        astep = anode
+                        break
+                #### Check if QEP step is faster than AQP step
+                if astep and step.node_cost < astep.node_cost:
+                    cost_ratio = astep.node_cost / step.node_cost
+                    ratio_2dp = round(cost_ratio * 100) / 100
+                    output_string += f"         {step.node_type} is {ratio_2dp} faster than astep.node_type"
+                
         # Sort
         elif "Sort" in step.node_type:
             output_string += step.node_type + "\n"
@@ -233,7 +305,7 @@ def generate_qep_reasons(root):
         anno_list.append(output_string)
 
     return anno_list
-
+    
 def print_annotations(anno_list):
     """
     Takes an array of annotation strings and prints all annotations
