@@ -193,7 +193,7 @@ def build_qep_tree(json_qep_data):
 def generate_QEP(query):
     print("generating main QEP")
     connection = preprocessing.DBConnection()
-    QEP = build_qep_tree(connection.getAQP(query, enable_seqscan=False)).print_qep_steps(enable_print=False)
+    QEP = build_qep_tree(connection.getAQP(query)).print_qep_steps(enable_print=False)
     connection.close()
     print("finished generating main QEP\n")
     return QEP
@@ -236,6 +236,19 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
     anno_list = []
     step_count = 1
     join_count = 0
+
+    # Create joins list
+    joins_list = []
+    for step in QEP:
+        if "Join" in step.node_type:
+            joins_list.append(step)
+    nojoin_steplist = []
+    for AQP in nojoin_AQPs:
+        ajoins_list = []
+        for step in AQP:
+            if "Join" in step.node_type:
+                ajoins_list.append(step)
+        nojoin_steplist.append(ajoins_list)
     
     # Review each step in the QEP
     for step in QEP: 
@@ -244,28 +257,113 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
 
         # Join
         if "Join" in step.node_type:
-            ## Nested Loop Join
+            ## Track if faster joins have been compared already
+            hash_join = False
+            merge_join = False
+            nestedloop_join = False
+            partwise_join = False
+            explained = False
+
+            ## Log
+            if log: print(f"QEP {step.node_type} costs {step.node_cost}")
+
+            ## Print the name of the Join
             if "Nest" in step.node_type:
-                output_string += f"Nested Loop Join\n"
-                output_string += \
+                output_string += f"Nested Loop Join\n" + \
                     "         This join is implemented using nested loop join because the cost of the nested loop is low.\n"
-            ## Other Join
             else:
                 output_string += step.node_type + "\n"
-                ### Compare with Merge Join
-                ### Compare with Hash Join
-                ### Compare with Nested Loop Join
+
+            ## Compare to other potential Joins
+            for ajoins_list in nojoin_steplist:
+                astep = None
+
+                ### Check if the AQP has the same number of joins
+                if len(ajoins_list) != len(joins_list):
+                    continue
+                
+                ### Find AQP join with the same complete relations and join separation
+                if log: print("Finding AQP join with the same complete relations and join separation")
+                relations_QEP = find_common_relations(step, QEP)
+                AQP = nojoin_AQPs[nojoin_steplist.index(ajoins_list)]
+                for ajoin in ajoins_list:
+                    relations_AQP = find_common_relations(ajoin, AQP)
+                    if relations_AQP == relations_QEP and ajoin.node_type != step.node_type:
+                        astep = ajoin
+                        if log: print("AQP join found")
+                        break
+
+                ### Otherwise find AQP join with the same half relations and join separation
+                if astep == None:
+                    if log: print("Finding AQP join with the same half relations and join separation")
+                    relations_QEP = find_common_relations(step, QEP)
+                    AQP = nojoin_AQPs[nojoin_steplist.index(ajoins_list)]
+                    for ajoin in ajoins_list:
+                        relations_AQP = find_common_relations(ajoin, AQP)
+                        if relations_AQP[:2] == relations_QEP[:2] and ajoin.node_type != step.node_type:
+                            astep = ajoin
+                            if log: print("AQP join found")
+                            break
+
+                ### Otherwise find AQP join with the same relations
+                if astep == None:
+                    if log: print("Finding AQP join with the same relations")
+                    relations_QEP = find_common_relations(step, QEP)
+                    AQP = nojoin_AQPs[nojoin_steplist.index(ajoins_list)]
+                    for ajoin in ajoins_list:
+                        relations_AQP = find_common_relations(ajoin, AQP)
+                        if relations_AQP[0] == relations_QEP[0] and relations_AQP[2] == relations_QEP[2] and ajoin.node_type != step.node_type:
+                            astep = ajoin
+                            if log: print("AQP join found")
+                            break
+
+                ### Otherwise the AQP has a different structure
+                if astep == None:
+                    #### Use the AQP join in the same position as QEP
+                    if log: print("Using AQP join in the same position as QEP")
+                    astep = ajoins_list[join_count]
+                    if "Hash" in astep.node_type and hash_join: continue
+                    if "Merge" in astep.node_type and merge_join: continue
+                    if "Nest" in astep.node_type and nestedloop_join: continue
+                    if "Partition" in astep.node_type and partwise_join: continue
+                    #### If AQP join is the same type as QEP join, skip this AQP
+                    if astep.node_type == step.node_type: 
+                        if log: print("AQP join not found")
+                        continue
+
+                ### Log
+                if log: print(f"AQP {astep.node_type} costs {astep.node_cost}")
+
+                ### Check if QEP step is faster than AQP step
+                if step.node_cost < astep.node_cost:
+                    cost_ratio = astep.node_cost / step.node_cost
+                    ratio_2dp = round(cost_ratio * 100) / 100
+                    output_string += f"         {step.node_type} is {ratio_2dp} faster than {astep.node_type}.\n"
+                    if "Hash" in astep.node_type: hash_join = True
+                    if "Merge" in astep.node_type: merge_join = True
+                    if "Nest" in astep.node_type: nestedloop_join = True
+                    if "Partition" in astep.node_type: partwise_join = True
+                    explained = True
+
+            ## Additional Explanations
+            if not explained and "Nest" not in step.node_type:
+                output_string += f"         {step.node_type} is faster than other join operations.\n"
+
+            ## Log
+            if log: print("")
 
             ## Increment join count for tracking
             join_count += 1
 
         # Scan
         elif "Scan" in step.node_type:
+            ## Track if faster scans have been compared already
             bitmap_scan = False
             index_scan = False
             indexonly_scan = False
             seq_scan = False
             tid_scan = False
+            explained = False
 
             ## Log
             if log: print(f"QEP {step.node_type} costs {step.node_cost}")
@@ -273,7 +371,7 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
             ## Print the name of the Scan
             if "Seq" in step.node_type:
                 output_string += f"Sequential Scan\n" + \
-                    "         Tables are read using sequential scan because no index is created on the tables.\n"
+                    "         Tables are read using Sequential Scan because no index is created on the tables.\n"
             else:
                 output_string += step.node_type + "\n"
             
@@ -299,11 +397,16 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
                     ratio_2dp = round(cost_ratio * 100) / 100
                     output_string += f"         {step.node_type} is {ratio_2dp} faster than " +\
                         f"{'Sequential Scan' if 'Seq' in astep.node_type else astep.node_type}.\n"
-                    bitmap_scan = True if "Bitmap" in astep.node_type else False
-                    index_scan = True if "Index Scan" in astep.node_type else False
-                    indexonly_scan = True if "Index Only Scan" in astep.node_type else False
-                    seq_scan = True if "Seq" in astep.node_type else False
-                    tid_scan = True if "TID" in astep.node_type else False
+                    if "Bitmap" in astep.node_type: bitmap_scan = True
+                    if "Index Scan" in astep.node_type: index_scan = True
+                    if "Index Only Scan" in astep.node_type: indexonly_scan = True
+                    if "Seq" in astep.node_type: seq_scan = True
+                    if "TID" in astep.node_type: tid_scan = True
+                    explained = True
+                
+            ## Additional Explanations
+            if not explained and "Seq" not in step.node_type:
+                output_string += f"         {step.node_type} is faster than other scan operations.\n"
 
             ## Log
             if log: print("")
@@ -319,6 +422,27 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
         anno_list.append(output_string)
 
     return anno_list
+
+def find_common_relations(join, step_list):
+    # List containing 2 scan relations and the number of joins between them and the input join
+    relation_list = [None, 0, None, 0]
+    relation_num = 0
+
+    idx = step_list.index(join) - 1
+
+    # Find scan relations in the children of the join node
+    while idx >= 0:
+        step = step_list[idx]
+        if "Join" in step.node_type:
+            relation_list[relation_num * 2 + 1] += 1
+        if "Scan" in step.node_type:
+            relation_list[relation_num * 2] = step.relation_name
+            relation_num += 1
+            if relation_num > 1:
+                break
+        idx -= 1
+        
+    return relation_list
 
 def print_annotations(anno_list):
     """
@@ -357,5 +481,5 @@ if __name__ == "__main__":
     QEP = generate_QEP(query)
     nojoin_AQPs = generate_nojoin_AQPs(query)
     noscan_AQPs = generate_noscan_AQPs(query)
-    anno_list = generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs)
+    anno_list = generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False)
     print_annotations(anno_list)
