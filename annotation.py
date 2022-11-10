@@ -119,6 +119,9 @@ class Node(object):
             for child in node.children: 
                 node_list.insert(0, child)
 
+        # Reverse the step list
+        step_list = step_list[::-1]
+
         if prints:
             for step in step_list:
                 print(step.node_type)
