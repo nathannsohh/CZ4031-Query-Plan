@@ -338,7 +338,7 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
                 if step.node_cost < astep.node_cost:
                     cost_ratio = astep.node_cost / step.node_cost
                     ratio_2dp = round(cost_ratio * 100) / 100
-                    output_string += f"         {step.node_type} is {ratio_2dp} faster than {astep.node_type}.\n"
+                    output_string += f"         {step.node_type} is {ratio_2dp} times faster than {astep.node_type}.\n"
                     if "Hash" in astep.node_type: hash_join = True
                     if "Merge" in astep.node_type: merge_join = True
                     if "Nest" in astep.node_type: nestedloop_join = True
@@ -395,7 +395,7 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
                 if astep and step.node_cost < astep.node_cost:
                     cost_ratio = astep.node_cost / step.node_cost
                     ratio_2dp = round(cost_ratio * 100) / 100
-                    output_string += f"         {step.node_type} is {ratio_2dp} faster than " +\
+                    output_string += f"         {step.node_type} is {ratio_2dp} times faster than " +\
                         f"{'Sequential Scan' if 'Seq' in astep.node_type else astep.node_type}.\n"
                     if "Bitmap" in astep.node_type: bitmap_scan = True
                     if "Index Scan" in astep.node_type: index_scan = True
