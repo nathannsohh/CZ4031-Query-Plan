@@ -1,7 +1,7 @@
 ## Just testing, will change to the actual project.py once everything is done
 
 import preprocessing
-from annotation import generate_qep_tree
+from annotation import build_qep_tree
 import queue
 
 connection = preprocessing.DBConnection()
@@ -37,7 +37,7 @@ query_analysis = connection.execute("EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, 
 print("Initial Query Analysis JSON:")
 print(query_analysis)
 
-qep_root_node = generate_qep_tree(query_analysis)
+qep_root_node = build_qep_tree(query_analysis)
 qep_root_node.set_step(0)
 
 # BFS just to see how the nodes look like

@@ -37,27 +37,107 @@ class Node(object):
         """
         return len(self.children)
 
-    def set_step(self, step):
-        self.step = step
-    
-    def update_desc(self,desc):
-        self.description = desc
+    def print_tree(self, prints=True):
+        """
+        Prints out the tree structure from this node
+        """
+        node_list = [self, None]
+        child_num_list = [1]
+        output_string = ""
 
-def generate_qep_tree(json_qep_data):
+        while len(node_list) != 0:
+            node = node_list.pop(0)
+            
+            # If branch has no children
+            if node == 0: 
+
+                # If it is not the end of the tree; length is 1 if only 'None' is remaining
+                if len(node_list) > 1: 
+                    output_string += "-"
+
+                # If there are branches on the same level
+                if node_list[0] != None: 
+                    output_string += " | "
+
+                continue
+        
+            # If end of tree level
+            if node == None: 
+                output_string += "\n"
+
+                if len(child_num_list) != 0:
+                    child_num_list.pop(0)
+                    
+                # If not the end of the tree; there are remaining nodes in the tree
+                if len(node_list) != 0: 
+                    node_list.append(None)
+                continue
+            
+            # If this is a node
+            else: 
+                output_string += node.node_type # Print the node type
+                child_num_list[0] -= 1
+                
+                # If this node has children
+                if node.num_children() != 0: 
+                    for child in node.children:
+                        node_list.append(child) # Add children to list
+                    child_num_list.append(node.num_children()) # Add number of children to the list
+                
+                # Otherwise indicate no children
+                else: 
+                    node_list.append(0)
+            
+            # If there is a sibling node
+            if child_num_list[0] != 0: 
+                output_string += " : " # Print sibling separator
+            
+            # If there is a different branch on the same level
+            elif node_list[0] != None: 
+                child_num_list.pop(0) # Remove children count for the current branch
+                output_string += " | " # Print branch separator
+
+        if prints:
+            print(output_string)
+
+        return output_string
+
+    def get_qep_steps(self, prints=True):
+        """
+        Generates the QEP steps in order
+        """
+        node_list = [self]
+        step_list = []
+
+        # Go through the tree
+        while len(node_list) != 0:
+
+            node = node_list.pop(0) # Remove this node from the step list
+            step_list.append(node) # Add this node to the step list
+
+            # Add the children of this node to the node list in reverse order
+            for child in node.children: 
+                node_list.insert(0, child)
+
+        if prints:
+            for step in step_list:
+                print(step.node_type)
+        return step_list
+
+def build_qep_tree(json_qep_data):
     """
     Takes QEP in json format as input and generates a tree structure for the QEP
     """
     child_plans = queue.Queue() # List of Plans
     parent_nodes = queue.Queue() # List of Nodes
 
-    # Get first Plan of the QEP
-    plan = json_qep_data[0][0][0]['Plan']
+    plan = json_qep_data[0][0][0]['Plan'] # Get first Plan of the QEP
 
     child_plans.put(plan)
     parent_nodes.put(None)
 
-    # Generate all Nodes for the QEP Tree
-    while not child_plans.empty():
+    # Get all Nodes for the QEP Tree
+    while not child_plans.empty(): 
         cur_plan = child_plans.get() # Current json Plan
         par_node = parent_nodes.get() # Parent Node
   
@@ -100,58 +180,48 @@ def generate_qep_tree(json_qep_data):
         # Add futher Plans to the list
         if 'Plans' in cur_plan:
             for plan in cur_plan['Plans']:
-                # Put child Plans in the list
-                child_plans.put(plan)
-                # Put the parent Nodes for each child Node into the list
-                parent_nodes.put(cur_node)
+                child_plans.put(plan) # Put child Plans in the list
+                parent_nodes.put(cur_node) # Put the parent Nodes for each child Node into the list
 
     return root_node
 
-def print_tree_structure(root):
-    node_list = [root, None]
-    child_num_list = [1]
+def generate_qep_reasons(root):
+    step_list = root.get_qep_steps(prints=False) # Generate QEP steps
 
-    while len(node_list) != 0:
-        node = node_list.pop(0)
-        # If branch has no children
-        if node == 0:
-            # If it is not the end of the tree
-            if len(node_list) > 1: # length is 1 if only 'None' is remaining
-                print("_", end = "")
-            # If there are branches on the same level
-            if node_list[0] != None:
-                print(" | ", end = "")
-            continue
-        # If end of tree level
-        if node == None:
-            print()
-            if len(child_num_list) != 0:
-                child_num_list.pop(0)
-                # If end of tree
-            if len(node_list) != 0:
-                node_list.append(None)
-            continue
-        # Print node type
-        else:
-            print(node.node_type, end = "")
-            child_num_list[0] -= 1
-            # Add children to list
-            if node.num_children() != 0:
-                for child in node.children:
-                    node_list.append(child)
-                child_num_list.append(node.num_children())
-            # Otherwise indicate no children
+    output_string = ""
+    step_count = 1
+
+    # Go through the step list
+    for step in step_list: 
+        output_string += f"Step {step_count:<2}: "
+        step_count += 1
+
+        # Join
+        if "Join" in step.node_type:
+            output_string += step.node_type + "\n"
+
+        # Scan
+        elif "Scan" in step.node_type:
+            ## Sequential Scan
+            if "Seq" in step.node_type:
+                output_string += f"Sequential Scan\n"
+                output_string += \
+                "         Tables are read using sequential scan.\n" + \
+                "         This is because no index is created on the tables.\n"
             else:
-                node_list.append(0)
-        # Print colon if there is a sibling node
-        if child_num_list[0] != 0:
-            print(" : ", end = "")
-        # Print seperator there is a different branch on the same level
-        elif node_list[0] != None:
-            child_num_list.pop(0)
-            print(" | ", end = "")
-    return
+                output_string += step.node_type + "\n"
 
+        # Sort
+        elif "Sort" in step.node_type:
+            output_string += step.node_type + "\n"
+
+        # Others
+        else:
+            output_string += step.node_type + "\n"
+
+    return output_string
+
+##############################################################################
 def generate_qep_conditions(op_name, conditions, table_subquery_name_pair):
     """
     Generates string conditions for a node operation
@@ -433,17 +503,6 @@ def generate_reasons(node_a, node_b, diff_idx):
 
     return text
 
-def print_tree_nodes(node):
-    numChildren = len(node.children)
-
-    print(node.node_type)
-
-    if numChildren != 0:
-        for childNum in range(numChildren):
-            print_tree_nodes(node(numChildren))
-    
-    pass
-
 def generate_text_arrays(nodeA, nodeB, difference, reasons):
     """
     Recursively compares the 2 trees
@@ -520,11 +579,11 @@ def generate_comparison(json_obj_A, json_obj_B):
     Returns this string as output
     """
     global diff_idx
-    root_node_a = generate_qep_tree(json_obj_A)
+    root_node_a = build_qep_tree(json_obj_A)
     reset_vars()
     generate_qep_text(root_node_a)
 
-    root_node_b = generate_qep_tree(json_obj_B)
+    root_node_b = build_qep_tree(json_obj_B)
     reset_vars()
     generate_qep_text(root_node_b)
 
@@ -550,6 +609,7 @@ def reset_vars():
     cur_step = 1
     cur_table_name = 1
     table_subquery_name_pair = {}
+##############################################################################
 
 query = """
     select
@@ -577,10 +637,12 @@ query = """
 if __name__ == "__main__":
     connection = preprocessing.DBConnection()
     # QEP_json = connection.getmainQEP(query)
-    QEP_json = connection.getAQP345(query)
+    QEP_json = connection.getALTQEP(query, 1)
     # AQP_json = connection.getALTQEP(query, 0)
     connection.close()
     # comparison = generate_comparison(QEP, AQP)
-    QEP = generate_qep_tree(QEP_json)
-    print_tree_structure(QEP)
+    QEP = build_qep_tree(QEP_json)
+    QEP.print_tree()
+    QEP.get_qep_steps()
+    print(generate_qep_reasons(QEP))
     # print(QEP_tree)

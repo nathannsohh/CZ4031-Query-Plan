@@ -8,7 +8,7 @@ default_randompage_cost = 4.0
 class DBConnection:
     # Open connection to DB, enter your database name and password
     # Change this accordingly
-    def __init__(self, host="localhost", port = 5432, database="TPC-H", user="postgres", password="postgres") -> None:
+    def __init__(self, host="localhost", port = 5432, database="TPC-H", user="postgres", password="password") -> None:
         self.conn = psycopg2.connect(host=host, port=port, database=database, user=user, password=password)
         self.cur = self.conn.cursor()
 
@@ -29,8 +29,8 @@ class DBConnection:
         elif operator == 2: self.cur.execute("SET enable_mergejoin TO 0")
         elif operator == 3: self.cur.execute("SET enable_nestloop TO 0")
         elif operator == 4: self.cur.execute("SET enable_bitmapscan TO 0")
-	elif operator == 5: self.cur.execute("SET enable_indexscan TO 0")
-	else:		    self.cur.execute("SET enable_seqscan TO 0")
+        elif operator == 5: self.cur.execute("SET enable_indexscan TO 0")
+        else:		    self.cur.execute("SET enable_seqscan TO 0")
         self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
         query_plan = self.cur.fetchall()
         # self.cur.execute("SET seq_page_cost TO " + str(default_seqpage_cost))
@@ -39,8 +39,8 @@ class DBConnection:
         elif operator == 2: self.cur.execute("SET enable_mergejoin TO 0")
         elif operator == 3: self.cur.execute("SET enable_nestloop TO 0")
         elif operator == 4: self.cur.execute("SET enable_bitmapscan TO 0")
-	elif operator == 5: self.cur.execute("SET enable_indexscan TO 0")
-	else:		    self.cur.execute("SET enable_seqscan TO 0")
+        elif operator == 5: self.cur.execute("SET enable_indexscan TO 0")
+        else:		    self.cur.execute("SET enable_seqscan TO 0")
         return query_plan
 
     def close(self):

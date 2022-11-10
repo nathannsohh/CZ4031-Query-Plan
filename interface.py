@@ -19,7 +19,7 @@ def fetchResultQuery(query):
 
 #will be changed - according to project.py
 def processQEPTree(annotate):
-    qep_root_node = annotation.generate_qep_tree(annotate)
+    qep_root_node = annotation.build_qep_tree(annotate)
     qep_root_node.set_step(0)
 
     # BFS just to see how the nodes look like
