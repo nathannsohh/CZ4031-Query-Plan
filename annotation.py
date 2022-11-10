@@ -191,19 +191,25 @@ def build_qep_tree(json_qep_data):
     return root_node
 
 def generate_qep_reasons(root):
+    """
+    Takes the root of a QEP Tree and generates an array of annotation strings
+    """
     step_list = root.print_qep_steps(prints=False) # Generate QEP steps
 
-    output_string = ""
+    anno_list = []
     step_count = 1
+    join_count = 0
 
     # Go through the step list
     for step in step_list: 
-        output_string += f"Step {step_count:<2}: "
+        output_string = f"Step {step_count:<2}: "
         step_count += 1
 
         # Join
         if "Join" in step.node_type:
+            
             output_string += step.node_type + "\n"
+            join_count += 1
 
         # Scan
         elif "Scan" in step.node_type:
@@ -224,7 +230,17 @@ def generate_qep_reasons(root):
         else:
             output_string += step.node_type + "\n"
 
-    return output_string
+        anno_list.append(output_string)
+
+    return anno_list
+
+def print_annotations(anno_list):
+    """
+    Takes an array of annotation strings and prints all annotations
+    """
+    for anno in anno_list:
+        print(anno, end="")
+    return
 
 ##############################################################################
 def generate_qep_conditions(op_name, conditions, table_subquery_name_pair):
@@ -649,5 +665,6 @@ if __name__ == "__main__":
     QEP = build_qep_tree(QEP_json)
     QEP.print_tree()
     QEP.print_qep_steps()
-    print(generate_qep_reasons(QEP))
+    anno_list = generate_qep_reasons(QEP)
+    print_annotations(anno_list)
     # print(QEP_tree)
