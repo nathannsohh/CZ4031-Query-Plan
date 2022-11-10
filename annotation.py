@@ -102,7 +102,7 @@ class Node(object):
 
         return output_string
 
-    def get_qep_steps(self, prints=True):
+    def print_qep_steps(self, prints=True):
         """
         Generates the QEP steps in order
         """
@@ -122,6 +122,8 @@ class Node(object):
         if prints:
             for step in step_list:
                 print(step.node_type)
+            print("")
+        
         return step_list
 
 def build_qep_tree(json_qep_data):
@@ -186,7 +188,7 @@ def build_qep_tree(json_qep_data):
     return root_node
 
 def generate_qep_reasons(root):
-    step_list = root.get_qep_steps(prints=False) # Generate QEP steps
+    step_list = root.print_qep_steps(prints=False) # Generate QEP steps
 
     output_string = ""
     step_count = 1
@@ -643,6 +645,6 @@ if __name__ == "__main__":
     # comparison = generate_comparison(QEP, AQP)
     QEP = build_qep_tree(QEP_json)
     QEP.print_tree()
-    QEP.get_qep_steps()
+    QEP.print_qep_steps()
     print(generate_qep_reasons(QEP))
     # print(QEP_tree)
