@@ -18,6 +18,13 @@ class DBConnection:
         return query_results
 
     def getmainQEP(self, query):
+        self.cur.execute("SET enable_hashjoin TO 1")
+        self.cur.execute("SET enable_mergejoin TO 1")
+        self.cur.execute("SET enable_nestloop TO 1")
+        self.cur.execute("SET enable_bitmapscan TO 1")
+        self.cur.execute("SET enable_indexscan TO 1")
+        self.cur.execute("SET enable_seqscan TO 1")
+
         self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
         query_plan = self.cur.fetchall()
         return query_plan
@@ -41,6 +48,20 @@ class DBConnection:
         elif operator == 4: self.cur.execute("SET enable_bitmapscan TO 1")
         elif operator == 5: self.cur.execute("SET enable_indexscan TO 1")
         else:		        self.cur.execute("SET enable_seqscan TO 1")
+        return query_plan
+
+    def getAQP(self, query, enable_hashjoin=True, enable_mergejoin=True, enable_nestloop=True,
+        enable_bitmapscan=True, enable_indexscan=True, enable_seqscan=True):
+        
+        self.cur.execute("SET enable_hashjoin TO 1") if enable_hashjoin else self.cur.execute("SET enable_hashjoin TO 0")
+        self.cur.execute("SET enable_mergejoin TO 1") if enable_mergejoin else self.cur.execute("SET enable_mergejoin TO 0")
+        self.cur.execute("SET enable_nestloop TO 1") if enable_nestloop else self.cur.execute("SET enable_nestloop TO 0")
+        self.cur.execute("SET enable_bitmapscan TO 1") if enable_bitmapscan else self.cur.execute("SET enable_bitmapscan TO 0")
+        self.cur.execute("SET enable_indexscan TO 1") if enable_indexscan else self.cur.execute("SET enable_indexscan TO 0")
+        self.cur.execute("SET enable_seqscan TO 1") if enable_seqscan else self.cur.execute("SET enable_seqscan TO 0")
+        
+        self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
+        query_plan = self.cur.fetchall()
         return query_plan
 
     def close(self):
