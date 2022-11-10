@@ -34,13 +34,13 @@ class DBConnection:
         self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
         query_plan = self.cur.fetchall()
         # self.cur.execute("SET seq_page_cost TO " + str(default_seqpage_cost))
-        if operator == 0:   self.cur.execute("SET enable_hashagg TO 0")
-        elif operator == 1: self.cur.execute("SET enable_hashjoin TO 0")
-        elif operator == 2: self.cur.execute("SET enable_mergejoin TO 0")
-        elif operator == 3: self.cur.execute("SET enable_nestloop TO 0")
-        elif operator == 4: self.cur.execute("SET enable_bitmapscan TO 0")
-        elif operator == 5: self.cur.execute("SET enable_indexscan TO 0")
-        else:		    self.cur.execute("SET enable_seqscan TO 0")
+        if operator == 0:   self.cur.execute("SET enable_hashagg TO 1")
+        elif operator == 1: self.cur.execute("SET enable_hashjoin TO 1")
+        elif operator == 2: self.cur.execute("SET enable_mergejoin TO 1")
+        elif operator == 3: self.cur.execute("SET enable_nestloop TO 1")
+        elif operator == 4: self.cur.execute("SET enable_bitmapscan TO 1")
+        elif operator == 5: self.cur.execute("SET enable_indexscan TO 1")
+        else:		        self.cur.execute("SET enable_seqscan TO 1")
         return query_plan
 
     def close(self):
