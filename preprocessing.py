@@ -8,7 +8,7 @@ default_randompage_cost = 4.0
 class DBConnection:
     # Open connection to DB, enter your database name and password
     # Change this accordingly
-    def __init__(self, host="localhost", port = 5432, database="TPC-H", user="postgres", password="password") -> None:
+    def __init__(self, host="localhost", port = 5432, database="TPC-H", user="postgres", password="postgres") -> None:
         self.conn = psycopg2.connect(host=host, port=port, database=database, user=user, password=password)
         self.cur = self.conn.cursor()
 
@@ -51,7 +51,7 @@ class DBConnection:
         return query_plan
 
     def getAQP(self, query, enable_hashjoin=True, enable_mergejoin=True, enable_nestloop=True,
-        enable_bitmapscan=True, enable_indexscan=True, enable_seqscan=True):
+        enable_bitmapscan=True, enable_indexscan=True, enable_seqscan=True, enable_indexonlyscan=True):
         
         self.cur.execute("SET enable_hashjoin TO 1") if enable_hashjoin else self.cur.execute("SET enable_hashjoin TO 0")
         self.cur.execute("SET enable_mergejoin TO 1") if enable_mergejoin else self.cur.execute("SET enable_mergejoin TO 0")
@@ -59,7 +59,8 @@ class DBConnection:
         self.cur.execute("SET enable_bitmapscan TO 1") if enable_bitmapscan else self.cur.execute("SET enable_bitmapscan TO 0")
         self.cur.execute("SET enable_indexscan TO 1") if enable_indexscan else self.cur.execute("SET enable_indexscan TO 0")
         self.cur.execute("SET enable_seqscan TO 1") if enable_seqscan else self.cur.execute("SET enable_seqscan TO 0")
-        
+        self.cur.execute("SET enable_indexonlyscan TO 1") if enable_indexonlyscan else self.cur.execute("SET enable_indexonlyscan TO 0")
+
         self.cur.execute(self.cur.mogrify("EXPLAIN (ANALYZE, FORMAT JSON) " + query))
         query_plan = self.cur.fetchall()
         return query_plan
