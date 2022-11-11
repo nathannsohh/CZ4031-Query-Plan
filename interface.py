@@ -18,7 +18,6 @@ def getresultMain(query):
     connection = preprocessing.DBConnection()
     plans.append(connection.execute(query))
     plans.append(connection.getmainQEP(query))
-    #plans.append(connection.getAQP(query))
     connection.close()
     return plans
 
@@ -35,13 +34,16 @@ def processQEPTree(json , anno_list , expander):
     parent=None
     while not q.empty():
         cur_node = q.get()
-        graph.node(name=str(cur_node) , label=cur_node.node_type)
+        labelling = cur_node.node_type + "\n"
+        if(cur_node.relation_name is not None):
+            labelling+=str(cur_node.relation_name)
+        graph.node(name=str(cur_node) , label=labelling)
         index = step_list.index(cur_node)
         
         #getting annotation and linking to relevant nodes
         string = getAnnotation(index , anno_list)
         if(string is not None):
-            graph.node(name=str(string) , label=string , color='red' )
+            graph.node(name=str(string) , label=string, color='red' )
             graph.edge(str(string) , str(cur_node) , color='red')
 
         print(cur_node.node_type)
@@ -65,39 +67,45 @@ def getAnnotation(index , anno_list):
     return None
     
 
-#interface page
-st.title("Query Plan Application")
-
-#col1, col2 = st.columns(2)
-#plan_options = ["Select QEP" , "Main QEP" , "Alternate QEP 1" , "Alternate QEP 2"]
-
-if 'btn_clicked' not in st.session_state:
-    st.session_state['btn_clicked'] = False
-
-
 def callback():
     # change state value
     st.session_state['btn_clicked'] = True
     
+def running():
+#interface page
+    st.title("Query Plan Application")
+    st.markdown("""
+    <style>
+        .graphviz stGraphVizChart css-pe32b6 e1p558ko0 svg{
+        height: fit-content;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-with st.form(key="query field"):
-    code = st.text_area("Enter Query:" , height=400 )
-    submit_code = st.form_submit_button("Execute" , on_click=callback)
+#col1, col2 = st.columns(2)
+#plan_options = ["Select QEP" , "Main QEP" , "Alternate QEP 1" , "Alternate QEP 2"]
+
+    if 'btn_clicked' not in st.session_state:
+        st.session_state['btn_clicked'] = False
+    with st.form(key="query field"):
+        code = st.text_area("Enter Query:" , height=400 )
+        submit_code = st.form_submit_button("Execute" , on_click=callback)
 
 
-if submit_code or st.session_state['btn_clicked']:
+    if submit_code or st.session_state['btn_clicked']:
     
-    anno_list= queryProcessing(code)
+        anno_list= queryProcessing(code)
     
-    val = getresultMain(code)
-    st.write("Query result:" )
-    st.write(val[0])
+        val = getresultMain(code)
+        st.write("Query result:" )
+        st.write(val[0])
 
-    expander = st.expander('Display Main Query Execution Plan')
-    processQEPTree(val[1] , anno_list , expander)
-    annotation.print_annotations(anno_list)
-    for anno in anno_list:
-        expander.write(anno)
+        expander = st.expander('Display Main Query Execution Plan')
+        processQEPTree(val[1] , anno_list , expander)
+        annotation.print_annotations(anno_list)
+        for anno in anno_list:
+            print(anno , "")
+            expander.write(anno)
     
     
 
