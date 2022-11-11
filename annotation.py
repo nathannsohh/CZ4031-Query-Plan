@@ -403,7 +403,7 @@ def generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False):
                 if log: print(f"AQP {astep.node_type} costs {astep.node_cost}") if astep else print("No AQP scan node found")
 
                 ### Check if QEP step is faster than AQP step
-                if astep and step.node_cost < astep.node_cost:
+                if astep and step.node_cost < astep.node_cost and step.node_cost > 0:
                     cost_ratio = astep.node_cost / step.node_cost
                     ratio_2dp = round(cost_ratio * 100) / 100
                     output_string += f"         {step.node_type} is used for Relation {step.relation_name} as it is {ratio_2dp} times faster than " +\
