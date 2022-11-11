@@ -1,7 +1,6 @@
 import annotation
 import streamlit as st
 import queue
-import time
 import graphviz
 import preprocessing
 
@@ -19,23 +18,21 @@ def getresultMain(query):
     connection = preprocessing.DBConnection()
     plans.append(connection.execute(query))
     plans.append(connection.getmainQEP(query))
+    #plans.append(connection.getAQP(query))
     connection.close()
     return plans
 
-#will be changed - according to project.py
-def processQEPTree(json , anno_list):
-    qep_root_node = annotation.build_qep_tree(json)
-    step_list = qep_root_node.print_qep_steps()
-
+def processQEPTree(json , anno_list , expander):
     graph = graphviz.Digraph()
     graph.attr(rankdir='BT')
     graph.attr('node', shape='rect')
-        
+    qep_root_node = annotation.build_qep_tree(json)
+    step_list = qep_root_node.print_qep_steps()
+
     q = queue.Queue()
     q.put(qep_root_node)
     
     parent=None
-    j=1
     while not q.empty():
         cur_node = q.get()
         graph.node(name=str(cur_node) , label=cur_node.node_type)
@@ -45,7 +42,7 @@ def processQEPTree(json , anno_list):
         string = getAnnotation(index , anno_list)
         if(string is not None):
             graph.node(name=str(string) , label=string , color='red' )
-            graph.edge(str(string) , str(cur_node) , color='red' , rankdir='LR')
+            graph.edge(str(string) , str(cur_node) , color='red')
 
         print(cur_node.node_type)
         if(parent!=None):
@@ -58,7 +55,7 @@ def processQEPTree(json , anno_list):
             parent = str(cur_node)
             q.put(node)
     
-    st.graphviz_chart(graph)
+    expander.graphviz_chart(graph , use_container_width=True)
 
 #find index node in step_list , which will then be used by anno_list 
 def getAnnotation(index , anno_list):
@@ -83,10 +80,8 @@ def callback():
     st.session_state['btn_clicked'] = True
     
 
-col1, col2, = st.columns(2)
-
 with st.form(key="query field"):
-    code = st.text_area("Enter Query:" , height=400)
+    code = st.text_area("Enter Query:" , height=400 )
     submit_code = st.form_submit_button("Execute" , on_click=callback)
 
 
@@ -97,12 +92,13 @@ if submit_code or st.session_state['btn_clicked']:
     val = getresultMain(code)
     st.write("Query result:" )
     st.write(val[0])
-    st.write("\n")
 
-    agree = st.checkbox('Display Main Query Execution Plan')
-
-    if agree:
-        processQEPTree(val[1] , anno_list)
+    expander = st.expander('Display Main Query Execution Plan')
+    processQEPTree(val[1] , anno_list , expander)
+    annotation.print_annotations(anno_list)
+    for anno in anno_list:
+        expander.write(anno)
+    
     
 
 
