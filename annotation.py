@@ -197,59 +197,14 @@ def build_qep_tree(json_qep_data):
 
     return root_node
 
-# Deprecated
-# def generate_QEP(query):
-#     print("generating main QEP")
-#     connection = preprocessing.DBConnection()
-#     QEP = build_qep_tree(connection.getAQP(query)).print_qep_steps(enable_print=False)
-#     connection.close()
-#     print("finished generating main QEP\n")
-#     return QEP
-
 def build_initial_QEP_tree(qep):
     return build_qep_tree(qep).print_qep_steps(enable_print=False)
-
-# Deprecated
-# def generate_nojoin_AQPs(query):
-#     nojoin_AQPs = []
-#     print("generating join disabled AQPs")
-#     connection = preprocessing.DBConnection()
-#     print("generating no_mergejoin_AQP")
-#     nojoin_AQPs.append(build_qep_tree(connection.getAQP(query, enable_mergejoin=False)).print_qep_steps(enable_print=False))
-#     print("generating no_hashjoin_AQP")
-#     nojoin_AQPs.append(build_qep_tree(connection.getAQP(query, enable_hashjoin=False)).print_qep_steps(enable_print=False))
-#     # print("generating no_mj_hj_AQP")
-#     # nojoin_AQPs.append(build_qep_tree(connection.getAQP(query, enable_mergejoin=False, enable_hashjoin=False)).print_qep_steps(enable_print=False))
-#     connection.close()
-#     print("finished generating join disabled AQPs\n")
-#     return nojoin_AQPs
 
 def build_nojoin_AQPs_tree_list(no_join_list):
     nojoin_AQPs = []
     for aqp in no_join_list:
         nojoin_AQPs.append(build_qep_tree(aqp).print_qep_steps(enable_print=False))
     return nojoin_AQPs
-
-# Deprecated
-# def generate_noscan_AQPs(query):
-#     noscan_AQPs = []
-#     print("generating scan disabled AQPs")
-#     connection = preprocessing.DBConnection()
-#     print("generating no_bitmapscan_AQP")
-#     noscan_AQPs.append(build_qep_tree(connection.getAQP(query, enable_bitmapscan=False)).print_qep_steps(enable_print=False))
-#     print("generating no_indexscan_AQP")
-#     noscan_AQPs.append(build_qep_tree(connection.getAQP(query, enable_indexscan=False)).print_qep_steps(enable_print=False))
-#     print("generating no_idxonlyscan_AQP")
-#     noscan_AQPs.append(build_qep_tree(connection.getAQP(query, enable_indexonlyscan=False)).print_qep_steps(enable_print=False))
-#     print("generating no_bmp_idx_AQP")
-#     noscan_AQPs.append(build_qep_tree(connection.getAQP(query, enable_bitmapscan=False, enable_indexscan=False)).print_qep_steps(enable_print=False))
-#     print("generating no_bmp_idxo_AQP")
-#     noscan_AQPs.append(build_qep_tree(connection.getAQP(query, enable_bitmapscan=False, enable_indexonlyscan=False)).print_qep_steps(enable_print=False))
-#     print("generating no_bmp_idx_idxo_AQP")
-#     noscan_AQPs.append(build_qep_tree(connection.getAQP(query, enable_bitmapscan=False, enable_indexscan=False, enable_indexonlyscan=False)).print_qep_steps(enable_print=False))
-#     connection.close()
-#     print("finished generating scan disabled AQPs\n")
-#     return noscan_AQPs
 
 def build_noscan_AQPs_tree_list(no_scan_list):
     noscan_AQPs = []
@@ -486,7 +441,7 @@ def print_annotations(anno_list):
 #################### Testing ####################
 
 query = """
-    select
+select
 	c_name,
 	c_custkey,
 	o_orderkey,
@@ -527,5 +482,5 @@ if __name__ == "__main__":
     no_scan_aqps_list = queryPlanGenerator.generateNoScanAQPsList(query)
     nojoin_AQPs = build_nojoin_AQPs_tree_list(no_join_aqps_list)
     noscan_AQPs = build_noscan_AQPs_tree_list(no_scan_aqps_list)
-    anno_list = generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=True)
+    anno_list = generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False)
     print_annotations(anno_list)
