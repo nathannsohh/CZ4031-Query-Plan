@@ -6,25 +6,32 @@ import preprocessing
 
 @st.cache
 def queryProcessing(code):
-    QEP = annotation.generate_QEP(code)
-    nojoin_AQPs = annotation.generate_nojoin_AQPs(code)
-    noscan_AQPs = annotation.generate_noscan_AQPs(code)
-    anno_list = annotation.generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs)
+    queryPlanGenerator = preprocessing.QueryPlanGenerator()
+    json = queryPlanGenerator.getAQP(code)
+    QEP = annotation.build_initial_QEP_tree(json)
+    no_join_aqps_list = queryPlanGenerator.generateNoJoinAQPsList(code)
+    no_scan_aqps_list = queryPlanGenerator.generateNoScanAQPsList(code)
+    nojoin_AQPs = annotation.build_nojoin_AQPs_tree_list(no_join_aqps_list)
+    noscan_AQPs = annotation.build_noscan_AQPs_tree_list(no_scan_aqps_list)
+    anno_list = annotation.generate_qep_reasons(QEP, nojoin_AQPs, noscan_AQPs, log=False)
+
     return anno_list
 
 
 def getresultMain(query):
     plans=[]
     connection = preprocessing.DBConnection()
+    queryPlanGenerator = preprocessing.QueryPlanGenerator()
     plans.append(connection.execute(query))
-    plans.append(connection.getmainQEP(query))
+    plans.append(queryPlanGenerator.getAQP(query))
     connection.close()
     return plans
 
-def processQEPTree(json , anno_list , expander):
+def processQEPTree(json , anno_list):
     graph = graphviz.Digraph()
-    graph.attr(rankdir='BT')
+    graph.attr(rankdir='BT' , bgcolor='lightblue' , margin='0.0 , 0.0')
     graph.attr('node', shape='rect')
+
     qep_root_node = annotation.build_qep_tree(json)
     step_list = qep_root_node.print_qep_steps()
 
@@ -57,7 +64,7 @@ def processQEPTree(json , anno_list , expander):
             parent = str(cur_node)
             q.put(node)
     
-    expander.graphviz_chart(graph , use_container_width=True)
+    st.graphviz_chart(graph , use_container_width=True)
 
 #find index node in step_list , which will then be used by anno_list 
 def getAnnotation(index , anno_list):
@@ -73,16 +80,9 @@ def callback():
     
 def running():
 #interface page
+    st.set_page_config(layout="wide")
     st.title("Query Plan Application")
-    st.markdown("""
-    <style>
-        .graphviz stGraphVizChart css-pe32b6 e1p558ko0 svg{
-        height: fit-content;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
-#col1, col2 = st.columns(2)
 #plan_options = ["Select QEP" , "Main QEP" , "Alternate QEP 1" , "Alternate QEP 2"]
 
     if 'btn_clicked' not in st.session_state:
@@ -100,13 +100,30 @@ def running():
         st.write("Query result:" )
         st.write(val[0])
 
-        expander = st.expander('Display Main Query Execution Plan')
-        processQEPTree(val[1] , anno_list , expander)
-        annotation.print_annotations(anno_list)
-        for anno in anno_list:
-            print(anno , "")
-            expander.write(anno)
-    
-    
+        st.markdown("""
+        <style>
+                .css-6awftf{
+                    right:0rem;
+                }
+                .css-pe32b6 svg{
+                    max-height:100%;
+                }
 
+        <style>
+        """ , unsafe_allow_html=True)
+      
+        agree = st.checkbox('Display Main Query Execution Plan')
+        
+        if(agree):
+            processQEPTree(val[1] , anno_list)
+            
+            annotation.print_annotations(anno_list)
+            for anno in anno_list:
+                val=anno.split("\n")
+                st.write(val[0])
+                st.write(val[1])
+                if(len(val)==3):
+                    st.write(val[2])
+    
+    
 
