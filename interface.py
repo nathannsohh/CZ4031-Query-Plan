@@ -4,6 +4,8 @@ import queue
 import graphviz
 import preprocessing
 
+#generate annotation with comparisons made to main QEP with 
+# AQPs without scan conditions and AQPs without join conditions
 @st.cache
 def queryProcessing(code):
     queryPlanGenerator = preprocessing.QueryPlanGenerator()
@@ -17,7 +19,7 @@ def queryProcessing(code):
 
     return anno_list
 
-
+#generate result of query and json result of QEP
 def getresultMain(query):
     plans=[]
     connection = preprocessing.DBConnection()
@@ -27,6 +29,7 @@ def getresultMain(query):
     connection.close()
     return plans
 
+#display QEP tree with relevant annotations
 def processQEPTree(json , anno_list):
     graph = graphviz.Digraph()
     graph.attr(rankdir='BT' , bgcolor='lightblue' , margin='0.0 , 0.0')
@@ -56,10 +59,7 @@ def processQEPTree(json , anno_list):
         print(cur_node.node_type)
         if(parent!=None):
             graph.edge(str(cur_node) , parent , dir='none')
-        #print("Level: " + str(j))
-        #print("===========================================")
-        #print("Annotation: " + str(cur_node.annotation))
-        #print("\n")
+
         for node in cur_node.children:
             parent = str(cur_node)
             q.put(node)
@@ -78,24 +78,21 @@ def callback():
     # change state value
     st.session_state['btn_clicked'] = True
     
-def running():
 #interface page
+def running():
     st.set_page_config(layout="wide")
     st.title("Query Plan Application")
 
-#plan_options = ["Select QEP" , "Main QEP" , "Alternate QEP 1" , "Alternate QEP 2"]
-
     if 'btn_clicked' not in st.session_state:
         st.session_state['btn_clicked'] = False
+
     with st.form(key="query field"):
         code = st.text_area("Enter Query:" , height=400 )
         submit_code = st.form_submit_button("Execute" , on_click=callback)
 
-
     if submit_code or st.session_state['btn_clicked']:
-    
+        
         anno_list= queryProcessing(code)
-    
         val = getresultMain(code)
         st.write("Query result:" )
         st.write(val[0])
@@ -115,8 +112,8 @@ def running():
         agree = st.checkbox('Display Main Query Execution Plan')
         
         if(agree):
+            #generate annotated QEP tree
             processQEPTree(val[1] , anno_list)
-            
             annotation.print_annotations(anno_list)
             for anno in anno_list:
                 val=anno.split("\n")
@@ -126,4 +123,3 @@ def running():
                     st.write(val[2])
     
     
-
