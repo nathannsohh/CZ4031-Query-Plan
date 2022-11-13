@@ -7,10 +7,11 @@ To install the relevant dependences for the application, from the terminal, navi
 `cd path\to\project\CZ4031-Query-Plan`
 
 Once you're in the project directory, run the following command in the terminal:
+
 `pip install -r requirements.txt`
 
 ### Displaying GUI of project
 
 In Windows and MacOS cmd, ensure you are in the folder of your repository.
 
-1. Run `streamlit run project.py`
+1. Run `python -m streamlit run project.py`
